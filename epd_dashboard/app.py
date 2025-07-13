@@ -66,7 +66,7 @@ class Dashboard:
 
     def touch_listener(self):
         while self.touch_flag:
-            if self.ui.screen_is_active:
+            if self.ui.app_is_running:
                 self.ui.detect_screen_interaction()
                 if self.ui.did_swipe:
                     if self.ui.swipe_direction == EPaperInterface.SWIPE_LEFT:
@@ -85,6 +85,11 @@ class Dashboard:
 
 
 def main():
+    if not os.path.exists("apps.json"):
+        os.mknod("apps.json")
+        with open('apps.json', 'w') as apps:
+            with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "apps.json"), 'r') as default_apps:
+                apps.write(default_apps.read())
     with open('apps.json', 'r') as widget_file:
         widget_objects = json.load(widget_file)
         widgets = []

@@ -8,7 +8,8 @@ with open("README.md", "r") as fh:
 package_data = {
 "": [
     "assets/*",
-    "assets/fonts/*"
+    "assets/fonts/*",
+    "apps.json"
     ]
 }
 
