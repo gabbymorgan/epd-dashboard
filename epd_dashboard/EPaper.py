@@ -1,3 +1,4 @@
+import logging
 import threading
 import os
 import time
@@ -31,6 +32,7 @@ class EPaperInterface():
 
     def __init__(self):
         try:
+            logging.basicConfig(level=logging.DEBUG)
             self.display = epd2in13_V4.EPD()
             self.width = self.display.width
             self.height = self.display.height
@@ -62,7 +64,7 @@ class EPaperInterface():
             self.tap_y = None
 
             self.base_touch_thread = threading.Thread(
-                daemon=True, target=self.base_touch_loop)
+                daemon=False, target=self.base_touch_loop)
             self.display_thread = threading.Thread(
                 daemon=False, target=self.display_loop)
 

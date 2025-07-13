@@ -1,6 +1,7 @@
 import json
 import shlex
 import subprocess
+import sys
 import threading
 import time
 
@@ -42,7 +43,7 @@ class Dashboard:
         self.touch_flag = True
 
         self.touch_thread = threading.Thread(
-            daemon=True, target=self.touch_listener)
+            daemon=False, target=self.touch_listener)
         self.touch_thread.start()
 
     def render_current_widget(self):
@@ -63,11 +64,12 @@ class Dashboard:
         self.render_current_widget()
 
     def launch_widget(self, widget):
-        print(f"would totally be doing the thing right now for {widget.name}")
-        # self.ui.shutdown()
-        # command = shlex.split(widget.command)
-        # subprocess.run(command)
-        pass
+        print(f"launching {widget.name}...")
+        self.touch_flag = False
+        self.ui.shutdown()
+        command = shlex.split(widget.command)
+        subprocess.Popen(command, shell=True, start_new_session=True)
+        sys.exit(0)
 
     def touch_listener(self):
         while self.touch_flag:
