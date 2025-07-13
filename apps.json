@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Reticulum",
+    "command": "nomadnet",
+    "imageUrl": "reticulum_logo_70.png"
+  },
+  {
+    "name": "Also Reticulum",
+    "command": "nomadnet",
+    "imageUrl": "reticulum_logo_70.png"
+  }
+]

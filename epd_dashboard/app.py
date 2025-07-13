@@ -1,0 +1,100 @@
+import json
+import shlex
+import subprocess
+import threading
+import time
+
+from PIL import Image, ImageDraw
+from epd_dashboard.EPaper import *
+
+
+class BoundingBox:
+    def __init__(self, min_x, max_x, min_y, max_y):
+        self.min_x = min_x
+        self.max_x = max_x
+        self.min_y = min_y
+        self.max_y = max_y
+
+
+class Widget:
+    def __init__(self, name: str, command: str, imageUrl: str, bounding_box: BoundingBox):
+        self.name = name
+        self.command = command
+        self.imageUrl = imageUrl
+        self.bounding_box = bounding_box
+
+    def tapIsWithinBoundingBox(self, touch_x, touch_y):
+        within_vertical_bounds = touch_x > self.bounding_box.min_x and touch_x < self.bounding_box.max_x
+        within_horizontal_bounds = touch_y > self.bounding_box.min_y and touch_y < self.bounding_box.max_y
+        if within_vertical_bounds and within_horizontal_bounds:
+            return True
+        else:
+            return False
+
+
+class Dashboard:
+    def __init__(self, widgets: list[Widget]):
+        self.ui = EPaperInterface()
+        self.widgets = widgets
+        self.current_widget_index = 0
+        self.touch_flag = True
+
+        self.touch_thread = threading.Thread(
+            daemon=True, target=self.touch_listener)
+        self.touch_thread.start()
+
+    def render_current_widget(self):
+        current_widget = self.widgets[self.current_widget_index]
+        image = Image.open(os.path.join(
+            picdir, current_widget.imageUrl))
+        self.ui.reset_canvas()
+        self.ui.canvas.paste(image, (50, 25))
+        draw = ImageDraw.Draw(self.ui.canvas)
+        draw.text((0, 0), current_widget.name, font=EPaperInterface.FONT_12)
+        self.ui.request_render()
+
+    def change_current_widget(self, widget_index):
+        self.current_widget_index = widget_index
+        self.render_current_widget()
+
+    def launch_widget(self, widget):
+        print(f"would totally be doing the thing right now for {widget.name}")
+        # self.ui.shutdown()
+        # command = shlex.split(widget.command)
+        # subprocess.run(command)
+        pass
+
+    def touch_listener(self):
+        while self.touch_flag:
+            if self.ui.screen_is_active:
+                self.ui.detect_screen_interaction()
+                if self.ui.did_swipe:
+                    if self.ui.swipe_direction == EPaperInterface.SWIPE_LEFT:
+                        new_index = min(
+                            len(self.widgets) - 1, self.current_widget_index + 1)
+                        self.change_current_widget(new_index)
+                    elif self.ui.swipe_direction == EPaperInterface.SWIPE_RIGHT:
+                        new_index = max(
+                            0, self.current_widget_index - 1)
+                        self.change_current_widget(new_index)
+                elif self.ui.did_tap:
+                    current_widget = self.widgets[self.current_widget_index]
+                    if current_widget.tapIsWithinBoundingBox(self.ui.tap_x, self.ui.tap_y):
+                        self.launch_widget(current_widget)
+            time.sleep(0.02)
+
+
+def main():
+    with open('apps.json', 'r') as widget_file:
+        widget_objects = json.load(widget_file)
+        widgets = []
+        for widget_object in widget_objects:
+            widget = Widget(widget_object["name"], widget_object["command"],
+                            widget_object["imageUrl"], BoundingBox(0, 122, 0, 250))
+            widgets.append(widget)
+        dashboard = Dashboard(widgets)
+        dashboard.render_current_widget()
+
+
+if __name__ == "__main__":
+    main()
