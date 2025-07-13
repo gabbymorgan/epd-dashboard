@@ -194,3 +194,13 @@ class EPaperInterface():
             'right_align': self.height-text_width,
             'center_align': (self.height-text_width)//2
         }
+    
+    def get_image_alignment(self, width, height):
+        return {
+            'horizontal_center': (self.height - width) //2,
+            'left': 0,
+            'right': self.height - width,
+            'vertical_center': (self.width - height) // 2,
+            'top': 0,
+            'bottom': self.width - height
+        }

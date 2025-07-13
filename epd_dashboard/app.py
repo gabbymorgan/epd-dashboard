@@ -17,6 +17,8 @@ class BoundingBox:
 
 
 class Widget:
+    WIDGET_SIZE = 70
+
     def __init__(self, name: str, command: str, imageUrl: str, bounding_box: BoundingBox):
         self.name = name
         self.command = command
@@ -48,9 +50,12 @@ class Dashboard:
         image = Image.open(os.path.join(
             picdir, current_widget.imageUrl))
         self.ui.reset_canvas()
-        self.ui.canvas.paste(image, (50, 25))
+        align_image = self.ui.get_image_alignment(Widget.WIDGET_SIZE, Widget.WIDGET_SIZE)
+        self.ui.canvas.paste(image, (align_image["horizontal_center"], align_image["vertical_center"]))
         draw = ImageDraw.Draw(self.ui.canvas)
-        draw.text((0, 0), current_widget.name, font=EPaperInterface.FONT_12)
+        text = current_widget.name
+        align_text = self.ui.get_alignment(text, EPaperInterface.FONT_12)
+        draw.text((align_text["center_align"], align_image["vertical_center"] + Widget.WIDGET_SIZE), text, font=EPaperInterface.FONT_12)
         self.ui.request_render()
 
     def change_current_widget(self, widget_index):
@@ -68,7 +73,7 @@ class Dashboard:
         while self.touch_flag:
             if self.ui.app_is_running:
                 self.ui.detect_screen_interaction()
-                if self.ui.did_swipe:
+                if self.ui.screen_is_active and self.ui.did_swipe:
                     if self.ui.swipe_direction == EPaperInterface.SWIPE_LEFT:
                         new_index = min(
                             len(self.widgets) - 1, self.current_widget_index + 1)
@@ -77,7 +82,7 @@ class Dashboard:
                         new_index = max(
                             0, self.current_widget_index - 1)
                         self.change_current_widget(new_index)
-                elif self.ui.did_tap:
+                elif self.ui.screen_is_active and self.ui.did_tap:
                     current_widget = self.widgets[self.current_widget_index]
                     if current_widget.tapIsWithinBoundingBox(self.ui.tap_x, self.ui.tap_y):
                         self.launch_widget(current_widget)
