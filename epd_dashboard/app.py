@@ -36,9 +36,9 @@ class Widget:
 
 
 class Dashboard:
-    def __init__(self, widgets: list[Widget]):
-        self.ui = EPaperInterface()
+    def __init__(self, widgets: list[Widget], ui=None):
         self.widgets = widgets
+        self.ui = ui
         self.current_widget_index = 0
         self.touch_flag = True
 
@@ -51,12 +51,15 @@ class Dashboard:
         image = Image.open(os.path.join(
             picdir, current_widget.imageUrl))
         self.ui.reset_canvas()
-        align_image = self.ui.get_image_alignment(Widget.WIDGET_SIZE, Widget.WIDGET_SIZE)
-        self.ui.canvas.paste(image, (align_image["horizontal_center"], align_image["vertical_center"]))
+        align_image = self.ui.get_image_alignment(
+            Widget.WIDGET_SIZE, Widget.WIDGET_SIZE)
+        self.ui.canvas.paste(
+            image, (align_image["horizontal_center"], align_image["vertical_center"]))
         draw = ImageDraw.Draw(self.ui.canvas)
         text = current_widget.name
         align_text = self.ui.get_alignment(text, EPaperInterface.FONT_12)
-        draw.text((align_text["center_align"], align_image["vertical_center"] + Widget.WIDGET_SIZE), text, font=EPaperInterface.FONT_12)
+        draw.text((align_text["center_align"], align_image["vertical_center"] +
+                  Widget.WIDGET_SIZE), text, font=EPaperInterface.FONT_12)
         self.ui.request_render()
 
     def change_current_widget(self, widget_index):
@@ -92,6 +95,7 @@ class Dashboard:
 
 
 def main():
+    ui = EPaperInterface()
     if not os.path.exists("apps.json"):
         os.mknod("apps.json")
         with open('apps.json', 'w') as apps:
@@ -100,11 +104,15 @@ def main():
     with open('apps.json', 'r') as widget_file:
         widget_objects = json.load(widget_file)
         widgets = []
+        alignment_data = ui.get_image_alignment(
+            Widget.WIDGET_SIZE, Widget.WIDGET_SIZE)
+        bounding_box = BoundingBox(alignment_data["vertical_center"], alignment_data["vertical_center"] +
+                                   Widget.WIDGET_SIZE, alignment_data["horizontal_center"], alignment_data["horizontal_center"] + Widget.WIDGET_SIZE)
         for widget_object in widget_objects:
             widget = Widget(widget_object["name"], widget_object["command"],
-                            widget_object["imageUrl"], BoundingBox(0, 122, 0, 250))
+                            widget_object["imageUrl"], bounding_box)
             widgets.append(widget)
-        dashboard = Dashboard(widgets)
+        dashboard = Dashboard(widgets, ui)
         dashboard.render_current_widget()
 
 
