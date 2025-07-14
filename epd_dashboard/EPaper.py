@@ -115,23 +115,25 @@ class EPaperInterface():
         self.touch_interface.GT_Scan(
             self.touch_interface_dev, self.touch_interface_old)
         self.is_touching = self.touch_interface_dev.TouchCount > 0
+        touch_x = self.height - self.touch_interface_dev.Y[0]
+        touch_y = self.touch_interface_dev.X[0]
 
         if self.is_touching:
             self.did_long_press = self.last_touched and self.has_been_touching and (
                 time.time() - self.last_touched) > EPaperInterface.HOLD_PRESS_INTERVAL
             if not self.has_been_touching:
                 self.last_touched = time.time()
-                self.touch_start_x = self.touch_interface_dev.X[0]
-                self.touch_start_y = self.touch_interface_dev.Y[0]
+                self.touch_start_x = touch_x
+                self.touch_start_y = touch_y
 
         if self.has_been_touching and not self.is_touching and not self.has_been_long_pressing:
-            self.touch_end_x = self.touch_interface_old.X[0]
-            self.touch_end_y = self.touch_interface_old.Y[0]
-            distance_horizontal = self.touch_start_y - self.touch_end_y
+            self.touch_end_x = touch_x
+            self.touch_end_y = touch_y
+            distance_horizontal = self.touch_start_x - self.touch_end_x
             self.did_swipe = abs(distance_horizontal) > 0
 
             if self.did_swipe:
-                self.swipe_direction = EPaperInterface.SWIPE_RIGHT if distance_horizontal > 0 else EPaperInterface.SWIPE_LEFT
+                self.swipe_direction = EPaperInterface.SWIPE_LEFT if distance_horizontal > 0 else EPaperInterface.SWIPE_RIGHT
             else:
                 self.did_tap = True
                 self.tap_x = self.touch_start_x
