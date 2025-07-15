@@ -13,11 +13,13 @@ class BoundingBox:
 class Widget:
     WIDGET_SIZE = 70
 
-    def __init__(self, name: str, command: str, imageUrl: str, bounding_box: BoundingBox):
+    def __init__(self, name: str, imageUrl: str, bounding_box: BoundingBox):
         self.name = name
-        self.command = command
         self.imageUrl = imageUrl
         self.bounding_box = bounding_box
+
+    def get_widget_image(self):
+        return Image.open(os.path.join(picdir, self.imageUrl))
 
     def tapIsWithinBoundingBox(self, touch_x, touch_y):
         within_vertical_bounds = touch_y > self.bounding_box.min_y and touch_y < self.bounding_box.max_y
@@ -26,6 +28,16 @@ class Widget:
             return True
         else:
             return False
+        
+class CommandWidget(Widget):
+    def __init__(self, name, imageUrl, bounding_box, command: str):
+        super().__init__(name, imageUrl, bounding_box)
+        self.command = command
+
+class NavigationWidget(Widget):
+    def __init__(self, name, imageUrl, bounding_box, page_index):
+        super().__init__(name, imageUrl, bounding_box)
+        self.page_index = page_index
 
 class Icon:
     ICON_SIZE = 24

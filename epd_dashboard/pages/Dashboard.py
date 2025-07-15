@@ -25,8 +25,8 @@ class Dashboard(Page):
             bounding_box = BoundingBox(alignment_data["horizontal_center"], alignment_data["horizontal_center"] +
                                        Widget.WIDGET_SIZE, alignment_data["vertical_center"], alignment_data["vertical_center"] + Widget.WIDGET_SIZE)
             for widget_object in widget_objects:
-                widget = Widget(widget_object["name"], widget_object["command"],
-                                widget_object["imageUrl"], bounding_box)
+                widget = CommandWidget(widget_object["name"],
+                                widget_object["imageUrl"], bounding_box, widget_object["command"])
                 self.widgets.append(widget)
 
         alignment_data = ui.get_image_alignment(
