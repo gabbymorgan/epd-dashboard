@@ -12,7 +12,7 @@ class Bluetooth(Page):
         self.options_list = OptionsList(router, self, [])
         self.options_loaded = False
         self.options_visible_start = 0
-        self.options_visible_end = 3
+        self.options_visible_end = 2
         self.backspace_icon = Icon(BoundingBox(
             0, Icon.ICON_SIZE, 0, Icon.ICON_SIZE), "backspace.bmp")
 
@@ -22,6 +22,9 @@ class Bluetooth(Page):
 
         self.down_icon = Icon(BoundingBox(
             alignment_data["horizontal_center"], alignment_data["horizontal_center"] + Icon.ICON_SIZE, alignment_data["bottom"], self.ui.width), "caret-down.bmp")
+        
+        self.up_icon = Icon(BoundingBox(
+            alignment_data["horizontal_center"], alignment_data["horizontal_center"] + Icon.ICON_SIZE,  0, Icon.ICON_SIZE), "caret-up.bmp")
 
         alignment_data = ui.get_image_alignment(
             Widget.WIDGET_SIZE, Widget.WIDGET_SIZE)
@@ -64,7 +67,7 @@ class Bluetooth(Page):
             draw.rectangle((whiteout_box.min_x, whiteout_box.min_y,
                            whiteout_box.max_x, whiteout_box.max_y), fill=255)
 
-        option_y = 0
+        option_y = Icon.ICON_SIZE
         for option_index, option in enumerate(self.options_list.options):
             if option_index < self.options_visible_start or option_index > self.options_visible_end:
                  option.bounding_box = None
@@ -78,8 +81,13 @@ class Bluetooth(Page):
                 draw.text((option.bounding_box.min_x, option.bounding_box.min_y),
                         option.name, font=EPaperInterface.FONT_20)
 
-        self.ui.canvas.paste(self.down_icon.get_icon_image(
-        ), (self.down_icon.bounding_box.min_x, self.down_icon.bounding_box.min_y))
+        if self.options_visible_end < len(self.options_list.options) - 1:
+            self.ui.canvas.paste(self.down_icon.get_icon_image(
+            ), (self.down_icon.bounding_box.min_x, self.down_icon.bounding_box.min_y))
+
+        if self.options_visible_start > 0:
+            self.ui.canvas.paste(self.up_icon.get_icon_image(
+            ), (self.up_icon.bounding_box.min_x, self.up_icon.bounding_box.min_y))
 
         self.ui.request_render()
 
@@ -100,8 +108,12 @@ class Bluetooth(Page):
                         self.options_visible_end = 3
                         self.update()
                     elif self.down_icon.is_tap_within_bounding_box(self.ui.tap_x, self.ui.tap_y):
-                        self.options_visible_start += 1
-                        self.options_visible_end += 1
+                        self.options_visible_start = min(len(self.options_list.options), self.options_visible_start + 1)
+                        self.options_visible_end = min(len(self.options_list.options), self.options_visible_end + 1)
+                        self.update()
+                    elif self.up_icon.is_tap_within_bounding_box(self.ui.tap_x, self.ui.tap_y):
+                        self.options_visible_start = max(0, self.options_visible_start - 1)
+                        self.options_visible_end = max(0, self.options_visible_end - 1)
                         self.update()
                     else:
                         self.options_list.scan_for_selection(
