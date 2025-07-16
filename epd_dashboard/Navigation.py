@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 import threading
 import time
 
@@ -15,7 +17,11 @@ class Router:
     def navigateTo(self, page_index):
         self.current_page_index = page_index
         current_page = self.pages[self.current_page_index]
-        current_page.update()
+        update_is_async = inspect.iscoroutinefunction(current_page.update)
+        if update_is_async:
+            asyncio.run(current_page.update())
+        else:
+            current_page.update()
 
 class Page:
     def __init__(self, page_index, router:Router, ui:EPaperInterface):

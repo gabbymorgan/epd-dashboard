@@ -46,6 +46,18 @@ class NavigationWidget(Widget):
         super().__init__(name, imageUrl, bounding_box)
         self.page_index = page_index
 
+class AnimatedWidget(Widget):
+    def __init__(self, name, file_paths, bounding_box):
+        super().__init__(name, file_paths[0], bounding_box)
+        self.file_paths = file_paths
+        self.current_imageUrl_index = 0
+
+    def next_frame(self):
+        self.current_imageUrl_index = (self.current_imageUrl_index + 1) % len(self.file_paths)
+        print(self.current_imageUrl_index)
+        self.imageUrl = self.file_paths[self.current_imageUrl_index]
+        print(self.imageUrl)
+
 class Icon(TouchableObject):
     ICON_SIZE = 24
 

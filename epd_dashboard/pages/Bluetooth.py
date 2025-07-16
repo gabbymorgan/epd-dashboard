@@ -1,4 +1,5 @@
 import subprocess
+import asyncio
 from PIL import ImageDraw
 
 from epd_dashboard.EPaper import *
@@ -16,28 +17,27 @@ class Bluetooth(Page):
         self.backspace_icon = Icon(BoundingBox(
             0, Icon.ICON_SIZE, 0, Icon.ICON_SIZE), "backspace.bmp")
 
-        alignment_data = ui.get_image_alignment(Icon.ICON_SIZE, Icon.ICON_SIZE)
+        icon_alignment = ui.get_image_alignment(Icon.ICON_SIZE, Icon.ICON_SIZE)
         self.refresh_icon = Icon(BoundingBox(
-            alignment_data["right"], self.ui.height, 0, Icon.ICON_SIZE), "refresh.bmp")
-
+            icon_alignment["right"], self.ui.height, 0, Icon.ICON_SIZE), "refresh.bmp")
         self.down_icon = Icon(BoundingBox(
-            alignment_data["horizontal_center"], alignment_data["horizontal_center"] + Icon.ICON_SIZE, alignment_data["bottom"], self.ui.width), "caret-down.bmp")
-        
+            icon_alignment["horizontal_center"], icon_alignment["horizontal_center"] + Icon.ICON_SIZE, icon_alignment["bottom"], self.ui.width), "caret-down.bmp")
         self.up_icon = Icon(BoundingBox(
-            alignment_data["horizontal_center"], alignment_data["horizontal_center"] + Icon.ICON_SIZE,  0, Icon.ICON_SIZE), "caret-up.bmp")
+            icon_alignment["horizontal_center"], icon_alignment["horizontal_center"] + Icon.ICON_SIZE,  0, Icon.ICON_SIZE), "caret-up.bmp")
 
-        alignment_data = ui.get_image_alignment(
+        widget_alignment = ui.get_image_alignment(
             Widget.WIDGET_SIZE, Widget.WIDGET_SIZE)
-        bounding_box = BoundingBox(alignment_data["horizontal_center"], alignment_data["horizontal_center"] +
-                                   Widget.WIDGET_SIZE, alignment_data["vertical_center"], alignment_data["vertical_center"] + Widget.WIDGET_SIZE)
-        self.loading_widget = Widget("Loading", "loader.bmp", bounding_box)
+        bounding_box = BoundingBox(widget_alignment["horizontal_center"], widget_alignment["horizontal_center"] +
+                                   Widget.WIDGET_SIZE, widget_alignment["vertical_center"], widget_alignment["vertical_center"] + Widget.WIDGET_SIZE)
+        self.loading_widget = AnimatedWidget("Loading", [
+                                             "loader-1.bmp", "loader-2.bmp", "loader-3.bmp", "loader-4.bmp"], bounding_box)
 
-    def load_options(self):
+    async def load_options(self):
         options = []
-        scan_process = subprocess.run(
-            ['bluetoothctl', '--timeout', '10', 'scan', 'on'])
-        bluetooth_process = subprocess.run(['bluetoothctl', 'devices'],
-                                           encoding='utf-8', stdout=subprocess.PIPE)
+        scan_process = await asyncio.create_subprocess_shell('bluetoothctl --timeout 10 scan on')
+        await scan_process.wait()
+        bluetooth_process = subprocess.run(
+            ['bluetoothctl',  'devices'], encoding='utf-8', stdout=subprocess.PIPE)
         for line in bluetooth_process.stdout.split('\n'):
             terms = line.split(" ")
             if terms[0] == "Device":
@@ -48,7 +48,21 @@ class Bluetooth(Page):
         self.options_list.options = options
         self.options_loaded = True
 
-    def update(self):
+    async def render_loading_widget(self, loading_task: asyncio.Task):
+        while not loading_task.done():
+            draw = ImageDraw.Draw(self.ui.canvas)
+            text = self.loading_widget.name
+            align_text = self.ui.get_alignment(
+                text, EPaperInterface.FONT_12)
+            draw.text((align_text["center_align"], self.loading_widget.bounding_box.min_y +
+                       Widget.WIDGET_SIZE), text, font=EPaperInterface.FONT_12)
+            self.ui.canvas.paste(self.loading_widget.get_widget_image(
+            ), (self.loading_widget.bounding_box.min_x, self.loading_widget.bounding_box.min_y))
+            self.ui.request_render()
+            self.loading_widget.next_frame()
+            await asyncio.sleep(1)
+
+    async def update(self):
         self.ui.reset_canvas()
         draw = ImageDraw.Draw(self.ui.canvas)
 
@@ -59,27 +73,28 @@ class Bluetooth(Page):
         ), (self.refresh_icon.bounding_box.min_x, self.refresh_icon.bounding_box.min_y))
 
         if not self.options_loaded:
-            self.ui.canvas.paste(self.loading_widget.get_widget_image(
-            ), (self.loading_widget.bounding_box.min_x, self.loading_widget.bounding_box.min_y))
             self.ui.request_render()
-            self.load_options()
-            whiteout_box = self.loading_widget.bounding_box
-            draw.rectangle((whiteout_box.min_x, whiteout_box.min_y,
-                           whiteout_box.max_x, whiteout_box.max_y), fill=255)
+            load_options_task = asyncio.create_task(self.load_options())
+            render_loading_widget = asyncio.create_task(
+                self.render_loading_widget(load_options_task))
+            await render_loading_widget
 
+        whiteout_box = self.loading_widget.bounding_box
+        draw.rectangle((whiteout_box.min_x, whiteout_box.min_y,
+                        whiteout_box.max_x, self.ui.width), fill=255)
         option_y = Icon.ICON_SIZE
         for option_index, option in enumerate(self.options_list.options):
             if option_index < self.options_visible_start or option_index > self.options_visible_end:
-                 option.bounding_box = None
+                option.bounding_box = None
             else:
                 alignment_data = self.ui.get_alignment(
                     option.name, EPaperInterface.FONT_20)
                 bounding_box = BoundingBox(alignment_data["center_align"], alignment_data["center_align"] +
-                                            alignment_data["text_width"], option_y, option_y + alignment_data["text_height"])
+                                           alignment_data["text_width"], option_y, option_y + alignment_data["text_height"])
                 option.bounding_box = bounding_box
-                option_y += alignment_data["text_height"] + 10
+                option_y += alignment_data["text_height"] + 5
                 draw.text((option.bounding_box.min_x, option.bounding_box.min_y),
-                        option.name, font=EPaperInterface.FONT_20)
+                          option.name, font=EPaperInterface.FONT_20)
 
         if self.options_visible_end < len(self.options_list.options) - 1:
             self.ui.canvas.paste(self.down_icon.get_icon_image(
@@ -105,16 +120,20 @@ class Bluetooth(Page):
                     elif self.refresh_icon.is_tap_within_bounding_box(self.ui.tap_x, self.ui.tap_y):
                         self.options_loaded = False
                         self.options_visible_start = 0
-                        self.options_visible_end = 3
-                        self.update()
+                        self.options_visible_end = 2
+                        asyncio.run(self.update())
                     elif self.down_icon.is_tap_within_bounding_box(self.ui.tap_x, self.ui.tap_y):
-                        self.options_visible_start = min(len(self.options_list.options), self.options_visible_start + 1)
-                        self.options_visible_end = min(len(self.options_list.options), self.options_visible_end + 1)
-                        self.update()
+                        self.options_visible_start = min(
+                            len(self.options_list.options), self.options_visible_start + 1)
+                        self.options_visible_end = min(
+                            len(self.options_list.options), self.options_visible_end + 1)
+                        asyncio.run(self.update())
                     elif self.up_icon.is_tap_within_bounding_box(self.ui.tap_x, self.ui.tap_y):
-                        self.options_visible_start = max(0, self.options_visible_start - 1)
-                        self.options_visible_end = max(0, self.options_visible_end - 1)
-                        self.update()
+                        self.options_visible_start = max(
+                            0, self.options_visible_start - 1)
+                        self.options_visible_end = max(
+                            0, self.options_visible_end - 1)
+                        asyncio.run(self.update())
                     else:
                         self.options_list.scan_for_selection(
                             self.ui.tap_x, self.ui.tap_y)
