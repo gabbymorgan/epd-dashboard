@@ -39,7 +39,7 @@ class Settings(Page):
         self.update()
 
     def touch_listener(self):
-        while self.touch_flag:
+        while self.touch_flag and self.ui.app_is_running:
             if self.ui.app_is_running and self.router.current_page_index == self.page_index:
                 self.ui.detect_screen_interaction()
                 if self.ui.screen_is_active and self.ui.did_swipe:

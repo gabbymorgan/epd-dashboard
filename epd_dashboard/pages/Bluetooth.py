@@ -96,8 +96,8 @@ class Bluetooth(Page):
                               encoding='utf-8', stdout=subprocess.PIPE)
 
     def touch_listener(self):
-        while self.touch_flag:
-            if self.ui.app_is_running and self.router.current_page_index == self.page_index:
+        while self.touch_flag and self.ui.app_is_running:
+            if self.router.current_page_index == self.page_index:
                 self.ui.detect_screen_interaction()
                 if self.ui.did_tap:
                     if self.backspace_icon.is_tap_within_bounding_box(self.ui.tap_x, self.ui.tap_y):
