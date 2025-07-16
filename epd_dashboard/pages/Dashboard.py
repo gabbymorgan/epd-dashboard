@@ -82,9 +82,9 @@ class Dashboard(Page):
                         self.change_current_widget(new_index)
                 elif self.ui.screen_is_active and self.ui.did_tap:
                     current_widget = self.widgets[self.current_widget_index]
-                    if current_widget.tapIsWithinBoundingBox(self.ui.tap_x, self.ui.tap_y):
+                    if current_widget.is_tap_within_bounding_box(self.ui.tap_x, self.ui.tap_y):
                         self.launch_widget(current_widget)
-                    elif self.settings_icon.tapIsWithinBoundingBox(self.ui.tap_x, self.ui.tap_y):
+                    elif self.settings_icon.is_tap_within_bounding_box(self.ui.tap_x, self.ui.tap_y):
                         self.router.navigateTo(Router.SETTINGS)
             time.sleep(0.02)
 

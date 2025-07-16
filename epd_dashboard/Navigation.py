@@ -33,5 +33,7 @@ class Page:
     def touch_listener(self):
         while self.touch_flag:
             if self.ui.app_is_running and self.router.current_page_index == self.page_index:
-                print(f"You have navigated to page {self.page_index}, and it appears not to be set up yet. Hope this helps!")
-            time.sleep(10)
+                self.ui.detect_screen_interaction()
+                if self.ui.screen_is_active and (self.ui.did_tap or self.ui.did_swipe):
+                    print(f"You have navigated to page {self.page_index}, and it appears not to be set up yet. Hope this helps!")
+            time.sleep(0.02)

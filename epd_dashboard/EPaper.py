@@ -21,6 +21,7 @@ class EPaperInterface():
     MAX_PARTIAL_REFRESHES = 30
     MAX_REFRESH_INTERVAL = 24 * 60 * 60
     TIMEOUT_INTERVAL = 120
+    FONT_20 = ImageFont.truetype(os.path.join(fontdir, 'Font.ttc'), 20)
     FONT_15 = ImageFont.truetype(os.path.join(fontdir, 'Font.ttc'), 15)
     FONT_12 = ImageFont.truetype(os.path.join(fontdir, 'Font.ttc'), 12)
 
