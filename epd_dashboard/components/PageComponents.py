@@ -16,6 +16,8 @@ class TouchableObject:
         self.bounding_box = bounding_box
 
     def is_tap_within_bounding_box(self, touch_x, touch_y):
+        if not self.bounding_box:
+            return False
         within_vertical_bounds = touch_y > self.bounding_box.min_y and touch_y < self.bounding_box.max_y
         within_horizontal_bounds = touch_x > self.bounding_box.min_x and touch_x < self.bounding_box.max_x
         if within_vertical_bounds and within_horizontal_bounds:
@@ -56,7 +58,7 @@ class Icon(TouchableObject):
         return Image.open(os.path.join(picdir, self.file_path))
         
 class Option(TouchableObject):
-    def __init__(self, name: str, value: str, bounding_box):
+    def __init__(self, name: str, value: str, bounding_box=None):
         super().__init__(bounding_box)
         self.name = name
         self.value = value
