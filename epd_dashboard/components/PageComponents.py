@@ -14,9 +14,10 @@ class BoundingBox:
 class TouchableObject:
     def __init__(self, bounding_box: BoundingBox):
         self.bounding_box = bounding_box
+        self.is_enabled = True
 
     def is_tap_within_bounding_box(self, touch_x, touch_y):
-        if not self.bounding_box:
+        if not self.bounding_box or not self.is_enabled:
             return False
         within_vertical_bounds = touch_y > self.bounding_box.min_y and touch_y < self.bounding_box.max_y
         within_horizontal_bounds = touch_x > self.bounding_box.min_x and touch_x < self.bounding_box.max_x
@@ -54,9 +55,7 @@ class AnimatedWidget(Widget):
 
     def next_frame(self):
         self.current_imageUrl_index = (self.current_imageUrl_index + 1) % len(self.file_paths)
-        print(self.current_imageUrl_index)
         self.imageUrl = self.file_paths[self.current_imageUrl_index]
-        print(self.imageUrl)
 
 class Icon(TouchableObject):
     ICON_SIZE = 24

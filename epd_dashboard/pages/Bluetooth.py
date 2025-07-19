@@ -5,6 +5,7 @@ from PIL import ImageDraw
 from epd_dashboard.EPaper import *
 from epd_dashboard.Navigation import *
 from epd_dashboard.components.PageComponents import *
+import epd_dashboard.bluetooth.bluetoothctl as bluetoothctl
 
 
 class Bluetooth(Page):
@@ -14,6 +15,7 @@ class Bluetooth(Page):
         self.options_loaded = False
         self.options_visible_start = 0
         self.options_visible_end = 2
+
         self.backspace_icon = Icon(BoundingBox(
             0, Icon.ICON_SIZE, 0, Icon.ICON_SIZE), "backspace.bmp")
 
@@ -31,21 +33,11 @@ class Bluetooth(Page):
                                    Widget.WIDGET_SIZE, widget_alignment["vertical_center"], widget_alignment["vertical_center"] + Widget.WIDGET_SIZE)
         self.loading_widget = AnimatedWidget("Loading", [
                                              "loader-1.bmp", "loader-2.bmp", "loader-3.bmp", "loader-4.bmp"], bounding_box)
-
+        
     async def load_options(self):
-        options = []
-        scan_process = await asyncio.create_subprocess_shell('bluetoothctl --timeout 10 scan on')
-        await scan_process.wait()
-        bluetooth_process = subprocess.run(
-            ['bluetoothctl',  'devices'], encoding='utf-8', stdout=subprocess.PIPE)
-        for line in bluetooth_process.stdout.split('\n'):
-            terms = line.split(" ")
-            if terms[0] == "Device":
-                name = " ".join(terms[2:])
-                value = terms[1]
-                options.append(
-                    Option(name, value))
-        self.options_list.options = options
+        await bluetoothctl.scan_for_seconds(10)
+        bluetooth_devices = await bluetoothctl.get_available_devices()
+        self.options_list.options = [Option(device["name"], device["value"]) for device in bluetooth_devices]
         self.options_loaded = True
 
     async def render_loading_widget(self, loading_task: asyncio.Task):
@@ -96,25 +88,31 @@ class Bluetooth(Page):
                 draw.text((option.bounding_box.min_x, option.bounding_box.min_y),
                           option.name, font=EPaperInterface.FONT_20)
 
-        if self.options_visible_end < len(self.options_list.options) - 1:
+        self.down_icon.is_enabled = self.options_visible_end < len(self.options_list.options) - 1
+        self.up_icon.is_enabled = self.options_visible_start > 0
+
+        if self.down_icon.is_enabled:
             self.ui.canvas.paste(self.down_icon.get_icon_image(
             ), (self.down_icon.bounding_box.min_x, self.down_icon.bounding_box.min_y))
 
-        if self.options_visible_start > 0:
+        if self.up_icon.is_enabled:
             self.ui.canvas.paste(self.up_icon.get_icon_image(
             ), (self.up_icon.bounding_box.min_x, self.up_icon.bounding_box.min_y))
 
         self.ui.request_render()
 
-    def connect_to_device(self, bluetooth_id):
-        proc = subprocess.run(['bluetoothctl', 'connect', bluetooth_id],
-                              encoding='utf-8', stdout=subprocess.PIPE)
+    async def connect_to_device(self, bluetooth_id):
+        connection_task = asyncio.create_task(bluetoothctl.connect_to_device(bluetooth_id))
+        render_loading_widget = asyncio.create_task(
+            self.render_loading_widget(connection_task))
+        await render_loading_widget
+
 
     def touch_listener(self):
         while self.touch_flag and self.ui.app_is_running:
             if self.router.current_page_index == self.page_index:
                 self.ui.detect_screen_interaction()
-                if self.ui.did_tap:
+                if self.ui.screen_is_active and self.ui.did_tap:
                     if self.backspace_icon.is_tap_within_bounding_box(self.ui.tap_x, self.ui.tap_y):
                         self.router.navigateTo(self.router.SETTINGS)
                     elif self.refresh_icon.is_tap_within_bounding_box(self.ui.tap_x, self.ui.tap_y):
@@ -138,6 +136,7 @@ class Bluetooth(Page):
                         self.options_list.scan_for_selection(
                             self.ui.tap_x, self.ui.tap_y)
                         if self.options_list.selected_option:
-                            self.connect_to_device(
-                                self.options_list.selected_option.value)
+                            asyncio.run(self.connect_to_device(
+                                self.options_list.selected_option.value))
+                            asyncio.run(self.update())
             time.sleep(0.02)
