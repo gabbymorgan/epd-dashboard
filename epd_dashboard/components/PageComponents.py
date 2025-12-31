@@ -2,7 +2,6 @@ import os
 from PIL import Image
 
 from epd_dashboard.EPaper import picdir
-from epd_dashboard.Navigation import *
 
 class BoundingBox:
     def __init__(self, min_x, max_x, min_y, max_y):
@@ -11,26 +10,29 @@ class BoundingBox:
         self.min_y = min_y
         self.max_y = max_y
 
-class TouchableObject:
-    def __init__(self, bounding_box: BoundingBox):
-        self.bounding_box = bounding_box
+class Component:
+    def __init__(self, parent=None):
         self.is_enabled = True
+        self.parent = parent
 
-    def is_tap_within_bounding_box(self, touch_x, touch_y):
-        if not self.bounding_box or not self.is_enabled:
-            return False
-        within_vertical_bounds = touch_y > self.bounding_box.min_y and touch_y < self.bounding_box.max_y
-        within_horizontal_bounds = touch_x > self.bounding_box.min_x and touch_x < self.bounding_box.max_x
-        if within_vertical_bounds and within_horizontal_bounds:
-            return True
-        else:
-            return False
+        if self.parent:
+            self.ui = self.parent.ui
+            if hasattr(self.parent, "router"):
+                self.router = self.parent.router
 
-class Widget(TouchableObject):
+    def start(self):
+        self.update()
+
+    def update(self):
+        return
+
+
+class Widget(Component):
     WIDGET_SIZE = 70
 
-    def __init__(self, name: str, imageUrl: str, bounding_box: BoundingBox):
-        super().__init__(bounding_box)
+    def __init__(self, parent: Component, name: str, imageUrl: str, bounding_box: BoundingBox):
+        super().__init__(parent)
+        self.bounding_box = bounding_box
         self.name = name
         self.imageUrl = imageUrl
 
@@ -38,18 +40,18 @@ class Widget(TouchableObject):
         return Image.open(os.path.join(picdir, self.imageUrl))
         
 class CommandWidget(Widget):
-    def __init__(self, name, imageUrl, bounding_box, command: str):
-        super().__init__(name, imageUrl, bounding_box)
+    def __init__(self, parent:Component, name, imageUrl, bounding_box, command: str):
+        super().__init__(parent, name, imageUrl, bounding_box)
         self.command = command
 
 class NavigationWidget(Widget):
-    def __init__(self, name, imageUrl, bounding_box, page_index):
-        super().__init__(name, imageUrl, bounding_box)
+    def __init__(self, parent: Component, name, imageUrl, bounding_box, page_index):
+        super().__init__(parent, name, imageUrl, bounding_box)
         self.page_index = page_index
 
 class AnimatedWidget(Widget):
-    def __init__(self, name, file_paths, bounding_box):
-        super().__init__(name, file_paths[0], bounding_box)
+    def __init__(self, parent: Component, name, file_paths, bounding_box):
+        super().__init__(parent, name, file_paths[0], bounding_box)
         self.file_paths = file_paths
         self.current_imageUrl_index = 0
 
@@ -57,34 +59,29 @@ class AnimatedWidget(Widget):
         self.current_imageUrl_index = (self.current_imageUrl_index + 1) % len(self.file_paths)
         self.imageUrl = self.file_paths[self.current_imageUrl_index]
 
-class Icon(TouchableObject):
+class Icon(Component):
     ICON_SIZE = 24
 
-    def __init__(self, bounding_box, file_path):
-        super().__init__(bounding_box)
+    def __init__(self, parent: Component, bounding_box, file_path):
+        super().__init__(parent)
         self.bounding_box = bounding_box
         self.file_path = file_path
 
     def get_icon_image(self):
         return Image.open(os.path.join(picdir, self.file_path))
         
-class Option(TouchableObject):
-    def __init__(self, name: str, value: str, bounding_box=None):
-        super().__init__(bounding_box)
+class Option(Component):
+    def __init__(self, parent: Component, name: str, value: str, bounding_box=None):
+        super().__init__(parent)
+        self.bounding_box = bounding_box
         self.name = name
         self.value = value
 
-class OptionsList():
-    def __init__(self, router:Router, parent: Page, options: list[Option]):
-        self.router = router
+class OptionsList(Component):
+    def __init__(self, parent: Component, options: list[Option]):
         self.parent = parent
         self.options = options
         self.selected_option = None
     
     def update(self):
         print(f"currently selected option: {self.selected_option}")
-
-    def scan_for_selection(self, touch_x, touch_y):
-        for option in self.options:
-            if option.is_tap_within_bounding_box(touch_x, touch_y):
-                self.selected_option = option

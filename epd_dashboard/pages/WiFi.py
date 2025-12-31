@@ -1,17 +1,19 @@
 import subprocess
 import asyncio
-from PIL import ImageDraw
+import nmcli
 
+from PIL import ImageDraw
 from epd_dashboard.EPaper import *
+from epd_dashboard.Navigation import *
 from epd_dashboard.components.PageComponents import *
 from epd_dashboard.services.error import log_error
 import epd_dashboard.services.bluetoothctl as bluetoothctl
 
 
-class Bluetooth(Component):
+class WiFi(Component):
     def __init__(self, parent):
         super().__init__(parent)
-        self.options_list = OptionsList(self, [])
+        self.options_list = OptionsList(self.router, self, [])
         self.options_loaded = False
         self.options_visible_start = 0
         self.options_visible_end = 2
@@ -21,39 +23,32 @@ class Bluetooth(Component):
 
         icon_alignment = self.ui.get_alignment(Icon.ICON_SIZE, Icon.ICON_SIZE)
         self.refresh_icon = Icon(self, BoundingBox(
-            icon_alignment["x_right"], self.ui.height, 0, Icon.ICON_SIZE), "refresh.bmp")
+            icon_alignment["right"], self.ui.height, 0, Icon.ICON_SIZE), "refresh.bmp")
         self.down_icon = Icon(self, BoundingBox(
-            icon_alignment["x_center"], icon_alignment["x_center"] + Icon.ICON_SIZE, icon_alignment["y_bottom"], self.ui.width), "caret-down.bmp")
+            icon_alignment["horizontal_center"], icon_alignment["horizontal_center"] + Icon.ICON_SIZE, icon_alignment["bottom"], self.ui.width), "caret-down.bmp")
         self.up_icon = Icon(self, BoundingBox(
-            icon_alignment["x_center"], icon_alignment["x_center"] + Icon.ICON_SIZE,  0, Icon.ICON_SIZE), "caret-up.bmp")
+            icon_alignment["horizontal_center"], icon_alignment["horizontal_center"] + Icon.ICON_SIZE,  0, Icon.ICON_SIZE), "caret-up.bmp")
 
         widget_alignment = self.ui.get_alignment(
             Widget.WIDGET_SIZE, Widget.WIDGET_SIZE)
-        bounding_box = BoundingBox(widget_alignment["x_center"], widget_alignment["x_center"] +
-                                   Widget.WIDGET_SIZE, widget_alignment["y_center"], widget_alignment["y_center"] + Widget.WIDGET_SIZE)
-        self.loading_widget = AnimatedWidget(self, "Loading", [
+        bounding_box = BoundingBox(widget_alignment["horizontal_center"], widget_alignment["horizontal_center"] +
+                                   Widget.WIDGET_SIZE, widget_alignment["vertical_center"], widget_alignment["vertical_center"] + Widget.WIDGET_SIZE)
+        self.loading_widget = AnimatedWidget("Loading", [
                                              "loader-1.bmp", "loader-2.bmp", "loader-3.bmp", "loader-4.bmp"], bounding_box)
         
-        self.keyboard_thread = threading.Thread(
-            daemon=False, target=self.keyboard_listener)
-        self.keyboard_thread.start()
-
     async def load_options(self):
         await bluetoothctl.scan_for_seconds(10)
         bluetooth_devices = await bluetoothctl.get_available_devices()
-        self.options_list.options = [
-            Option(device["name"], device["value"]) for device in bluetooth_devices]
+        self.options_list.options = [Option(device["name"], device["value"]) for device in bluetooth_devices]
         self.options_loaded = True
 
     async def render_loading_widget(self, loading_task: asyncio.Task):
         while not loading_task.done():
             draw = ImageDraw.Draw(self.ui.canvas)
             text = self.loading_widget.name
-            text_width, text_height = self.ui.get_text_dimensions(
-                text, EPaperInterface.FONT_12)
             align_text = self.ui.get_alignment(
-                text_width, text_height)
-            draw.text((align_text["x_center"], self.loading_widget.bounding_box.min_y +
+                text, EPaperInterface.FONT_12)
+            draw.text((align_text["center_align"], self.loading_widget.bounding_box.min_y +
                        Widget.WIDGET_SIZE), text, font=EPaperInterface.FONT_12)
             self.ui.canvas.paste(self.loading_widget.get_widget_image(
             ), (self.loading_widget.bounding_box.min_x, self.loading_widget.bounding_box.min_y))
@@ -86,19 +81,16 @@ class Bluetooth(Component):
             if option_index < self.options_visible_start or option_index > self.options_visible_end:
                 option.bounding_box = None
             else:
-                text_width, text_height = self.ui.get_text_dimensions(
-                    option.name, EPaperInterface.FONT_20)
                 alignment_data = self.ui.get_alignment(
-                    text_width, text_height)
-                bounding_box = BoundingBox(alignment_data["x_center"], alignment_data["x_center"] +
-                                           text_width, option_y, option_y + text_height)
+                    option.name, EPaperInterface.FONT_20)
+                bounding_box = BoundingBox(alignment_data["center_align"], alignment_data["center_align"] +
+                                           alignment_data["text_width"], option_y, option_y + alignment_data["text_height"])
                 option.bounding_box = bounding_box
                 option_y += alignment_data["text_height"] + 5
                 draw.text((option.bounding_box.min_x, option.bounding_box.min_y),
                           option.name, font=EPaperInterface.FONT_20)
 
-        self.down_icon.is_enabled = self.options_visible_end < len(
-            self.options_list.options) - 1
+        self.down_icon.is_enabled = self.options_visible_end < len(self.options_list.options) - 1
         self.up_icon.is_enabled = self.options_visible_start > 0
 
         if self.down_icon.is_enabled:
@@ -111,39 +103,19 @@ class Bluetooth(Component):
 
         self.ui.request_render()
 
-    async def connect_to_device(self, bluetooth_id):
-        connection_task = asyncio.create_task(
-            bluetoothctl.connect_to_device(bluetooth_id))
-        render_loading_widget = asyncio.create_task(
-            self.render_loading_widget(connection_task))
-        await render_loading_widget
 
     def keyboard_listener(self):
         while self.ui.app_is_running:
-            if self.router.current_page_index == EPaperInterface.PAGE_INDEX_BLUETOOTH:
+            if self.router.current_page_index == EPaperInterface.PAGE_INDEX_DASHBOARD:
                 incoming_char = self.ui.incoming_char
                 match incoming_char:
-                    case readchar.key.ESC:
-                        self.router.navigate(EPaperInterface.PAGE_INDEX_SETTINGS)
-                    case readchar.key.CTRL_R:
-                        self.options_loaded = False
-                        self.options_visible_start = 0
-                        self.options_visible_end = 2
-                        asyncio.run(self.update())
-                    case readchar.key.DOWN:
-                        self.options_visible_start = min(
-                            len(self.options_list.options), self.options_visible_start + 1)
-                        self.options_visible_end = min(
-                            len(self.options_list.options), self.options_visible_end + 1)
-                        asyncio.run(self.update())
-                    case readchar.key.UP:
-                        self.options_visible_start = max(
-                            0, self.options_visible_start - 1)
-                        self.options_visible_end = max(
-                            0, self.options_visible_end - 1)
-                        asyncio.run(self.update())
+                    case readchar.key.RIGHT:
+                        self.change_current_widget(min(
+                            len(self.widgets) - 1, self.current_widget_index + 1))
+                    case readchar.key.LEFT:
+                        self.change_current_widget(max(
+                            0, self.current_widget_index - 1))
                     case readchar.key.ENTER:
-                            asyncio.run(self.connect_to_device(
-                                self.options_list.selected_option.value))
-                            asyncio.run(self.update())
+                        self.launch_widget(self.widgets[
+                            self.current_widget_index])
             time.sleep(0.02)

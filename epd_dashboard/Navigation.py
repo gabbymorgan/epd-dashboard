@@ -1,45 +1,55 @@
-import asyncio
-import inspect
-import threading
-import time
+import os
 
-from epd_dashboard.EPaper import EPaperInterface
+from .pages.Dashboard import Dashboard
+from .pages.Settings import Settings
+from .pages.Bluetooth import Bluetooth
+from .EPaper import *
+from .components.PageComponents import *
 
-class Router:
-    DASHBOARD =  0
-    SETTINGS =   1
-    BLUETOOTH =  2
+fontdir = os.path.join(os.path.dirname(os.path.dirname(
+    os.path.realpath(__file__))), 'epaperui/assets/fonts')
+picdir = os.path.join(os.path.dirname(os.path.dirname(
+    os.path.realpath(__file__))), 'epaperui/assets')
 
-    def __init__(self):
-        self.pages = []
-        self.current_page_index = 0
 
-    def navigateTo(self, page_index):
-        self.current_page_index = page_index
-        current_page = self.pages[self.current_page_index]
-        update_is_async = inspect.iscoroutinefunction(current_page.update)
-        if update_is_async:
-            asyncio.run(current_page.update())
-        else:
-            current_page.update()
-
-class Page:
-    def __init__(self, page_index, router:Router, ui:EPaperInterface):
-        self.page_index = page_index
-        self.router = router
+class MainDisplay(Component):
+    def __init__(self, ui):
+        super().__init__()
         self.ui = ui
-        self.touch_flag = True
-        self.touch_thread = threading.Thread(daemon=False, target=self.touch_listener)
+        self.height = self.ui.display.height
+        self.width = self.ui.display.width
+        self.app_is_running = True
 
-        self.touch_thread.start()
+        self.router = Router(self)
+
 
     def update(self):
         return
-    
-    def touch_listener(self):
-        while self.touch_flag and self.ui.app_is_running:
-            if self.ui.app_is_running and self.router.current_page_index == self.page_index:
-                self.ui.detect_screen_interaction()
-                if self.ui.screen_is_active and (self.ui.did_tap or self.ui.did_swipe):
-                    print(f"You have navigated to page {self.page_index}, and it appears not to be set up yet. Hope this helps!")
-            time.sleep(0.02)
+
+class Router(Component):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.router = self
+        self.height = round(self.ui.height * .9)
+        self.width = self.ui.width
+        self.current_page_index = EPaperInterface.PAGE_INDEX_DASHBOARD
+        self.prev_page_index = EPaperInterface.PAGE_INDEX_DASHBOARD
+        self.dashboard_display = Dashboard(self)
+        self.settings_display = Settings(self)
+        self.bluetooth_display = Bluetooth(self)
+        # self.wifi_display = WiFi(self)
+        self.pages = [self.dashboard_display, self.settings_display, self.bluetooth_display]
+
+        self.start()
+
+    def start(self):
+        for page in self.pages:
+            page.start()
+        self.update()
+
+
+    def navigate(self, page_index):
+        self.prev_page_index = self.current_page_index
+        self.current_page_index = page_index
+        current_page = self.pages[self.current_page_index]
+        current_page.update()

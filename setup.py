@@ -32,6 +32,6 @@ setuptools.setup(
     entry_points= {
         'console_scripts': ['epd_dashboard=epd_dashboard.app:main']
     },
-    install_requires=["gpiozero", "smbus", "spidev", "lgpio", "numpy", "pillow", "arrow", "readchar"],
+    install_requires=["gpiozero", "smbus", "spidev", "lgpio", "numpy", "pillow", "arrow", "readchar", "nmcli"],
     python_requires=">=3.7",
 )
