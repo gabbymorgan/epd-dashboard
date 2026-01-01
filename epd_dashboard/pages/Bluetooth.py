@@ -12,9 +12,10 @@ class Bluetooth(Component):
     def __init__(self, parent):
         super().__init__(parent)
         self.options_list = OptionsList(self, [])
+        self.loading = False
         self.options_loaded = False
         self.options_visible_start = 0
-        self.options_visible_end = 2
+        self.options_visible_end = 3
 
         self.backspace_icon = Icon(self, BoundingBox(
             0, Icon.ICON_SIZE, 0, Icon.ICON_SIZE), "backspace.bmp")
@@ -33,20 +34,25 @@ class Bluetooth(Component):
                                    Widget.WIDGET_SIZE, widget_alignment["y_center"], widget_alignment["y_center"] + Widget.WIDGET_SIZE)
         self.loading_widget = AnimatedWidget(self, "Loading", [
                                              "loader-1.bmp", "loader-2.bmp", "loader-3.bmp", "loader-4.bmp"], bounding_box)
-        
+
         self.keyboard_thread = threading.Thread(
             daemon=False, target=self.keyboard_listener)
         self.keyboard_thread.start()
 
     async def load_options(self):
+        self.loading = True
+        loading_widget = asyncio.create_task(self.render_loading_widget())
         await bluetoothctl.scan_for_seconds(10)
         bluetooth_devices = await bluetoothctl.get_available_devices()
         self.options_list.options = [
-            Option(device["name"], device["value"]) for device in bluetooth_devices]
+            Option(self, device["name"], device["value"]) for device in bluetooth_devices]
+        self.options_list.selected_option_index = 0 if len(self.options_list.options) else None
+        self.loading = False
         self.options_loaded = True
+        await loading_widget
 
-    async def render_loading_widget(self, loading_task: asyncio.Task):
-        while not loading_task.done():
+    async def render_loading_widget(self):
+        while self.loading:
             draw = ImageDraw.Draw(self.ui.canvas)
             text = self.loading_widget.name
             text_width, text_height = self.ui.get_text_dimensions(
@@ -61,7 +67,9 @@ class Bluetooth(Component):
             self.loading_widget.next_frame()
             await asyncio.sleep(1)
 
-    async def update(self):
+    def update(self):
+        if self.router.current_page_index != EPaperInterface.PAGE_INDEX_BLUETOOTH:
+            return
         self.ui.reset_canvas()
         draw = ImageDraw.Draw(self.ui.canvas)
 
@@ -71,12 +79,9 @@ class Bluetooth(Component):
         self.ui.canvas.paste(self.refresh_icon.get_icon_image(
         ), (self.refresh_icon.bounding_box.min_x, self.refresh_icon.bounding_box.min_y))
 
-        if not self.options_loaded:
+        if not self.loading and not self.options_loaded:
+            asyncio.run(self.load_options())
             self.ui.request_render()
-            load_options_task = asyncio.create_task(self.load_options())
-            render_loading_widget = asyncio.create_task(
-                self.render_loading_widget(load_options_task))
-            await render_loading_widget
 
         whiteout_box = self.loading_widget.bounding_box
         draw.rectangle((whiteout_box.min_x, whiteout_box.min_y,
@@ -87,15 +92,17 @@ class Bluetooth(Component):
                 option.bounding_box = None
             else:
                 text_width, text_height = self.ui.get_text_dimensions(
-                    option.name, EPaperInterface.FONT_20)
+                    option.name, EPaperInterface.FONT_15)
                 alignment_data = self.ui.get_alignment(
                     text_width, text_height)
                 bounding_box = BoundingBox(alignment_data["x_center"], alignment_data["x_center"] +
                                            text_width, option_y, option_y + text_height)
                 option.bounding_box = bounding_box
-                option_y += alignment_data["text_height"] + 5
+                option_y += text_height + 5
                 draw.text((option.bounding_box.min_x, option.bounding_box.min_y),
-                          option.name, font=EPaperInterface.FONT_20)
+                          option.name, font=EPaperInterface.FONT_15)
+                if (option_index == self.options_list.selected_option_index):
+                    draw.text((option.bounding_box.min_x - 10, option.bounding_box.min_y), '>', font=EPaperInterface.FONT_15)
 
         self.down_icon.is_enabled = self.options_visible_end < len(
             self.options_list.options) - 1
@@ -112,10 +119,13 @@ class Bluetooth(Component):
         self.ui.request_render()
 
     async def connect_to_device(self, bluetooth_id):
+        self.loading = True
         connection_task = asyncio.create_task(
             bluetoothctl.connect_to_device(bluetooth_id))
         render_loading_widget = asyncio.create_task(
             self.render_loading_widget(connection_task))
+        await connection_task
+        self.loading = False
         await render_loading_widget
 
     def keyboard_listener(self):
@@ -123,27 +133,33 @@ class Bluetooth(Component):
             if self.router.current_page_index == EPaperInterface.PAGE_INDEX_BLUETOOTH:
                 incoming_char = self.ui.incoming_char
                 match incoming_char:
-                    case readchar.key.ESC:
-                        self.router.navigate(EPaperInterface.PAGE_INDEX_SETTINGS)
-                    case readchar.key.CTRL_R:
-                        self.options_loaded = False
+                    case 'b':
+                        self.router.navigate(
+                            EPaperInterface.PAGE_INDEX_SETTINGS)
+                    case 'r':
+                        if self.loading:
+                            return
                         self.options_visible_start = 0
-                        self.options_visible_end = 2
-                        asyncio.run(self.update())
+                        self.options_visible_end = 3
+                        self.options_list.selected_option_index = 0
+                        asyncio.run(self.load_options())
+                        self.update()
                     case readchar.key.DOWN:
                         self.options_visible_start = min(
-                            len(self.options_list.options), self.options_visible_start + 1)
+                            max(0, len(self.options_list.options) - 4), self.options_visible_start + 1)
                         self.options_visible_end = min(
-                            len(self.options_list.options), self.options_visible_end + 1)
-                        asyncio.run(self.update())
+                            len(self.options_list.options) - 1, self.options_visible_end + 1)
+                        self.options_list.update_selected_option_index(self.options_list.selected_option_index + 1)
+                        self.update()
                     case readchar.key.UP:
                         self.options_visible_start = max(
                             0, self.options_visible_start - 1)
                         self.options_visible_end = max(
-                            0, self.options_visible_end - 1)
-                        asyncio.run(self.update())
+                            3, self.options_visible_end - 1)
+                        self.options_list.update_selected_option_index(self.options_list.selected_option_index - 1)
+                        self.update()
                     case readchar.key.ENTER:
-                            asyncio.run(self.connect_to_device(
-                                self.options_list.selected_option.value))
-                            asyncio.run(self.update())
+                        asyncio.run(self.connect_to_device(
+                            self.options_list.options[self.options_list.selected_option_index].value))
+                        self.update()
             time.sleep(0.02)

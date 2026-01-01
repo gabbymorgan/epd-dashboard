@@ -78,10 +78,15 @@ class Option(Component):
         self.value = value
 
 class OptionsList(Component):
-    def __init__(self, parent: Component, options: list[Option]):
+    def __init__(self, parent: Component, options: list[Option], default_option=None):
         self.parent = parent
         self.options = options
-        self.selected_option = None
+        self.selected_option_index = default_option
     
     def update(self):
-        print(f"currently selected option: {self.selected_option}")
+        print(f"currently selected option: {self.selected_option_index}")
+
+    def update_selected_option_index(self, option_index):
+        if (option_index >= 0 and option_index < len(self.options)):
+            self.selected_option_index = option_index
+        self.update()
