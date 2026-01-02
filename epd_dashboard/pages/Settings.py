@@ -73,7 +73,7 @@ class Settings(Component):
                     case readchar.key.ENTER:
                         current_widget = self.widgets[self.current_widget_index]
                         self.router.navigate(current_widget.page_index)
-                    case readchar.key.ESC:
+                    case readchar.key.CTRL_B:
                         self.router.navigate(
                             EPaperInterface.PAGE_INDEX_DASHBOARD)
                 time.sleep(0.02)

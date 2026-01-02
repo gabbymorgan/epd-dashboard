@@ -3,6 +3,7 @@ import os
 from .pages.Dashboard import Dashboard
 from .pages.Settings import Settings
 from .pages.Bluetooth import Bluetooth
+from .pages.WiFi import WiFi
 from .EPaper import *
 from .components.PageComponents import *
 
@@ -37,8 +38,8 @@ class Router(Component):
         self.dashboard_display = Dashboard(self)
         self.settings_display = Settings(self)
         self.bluetooth_display = Bluetooth(self)
-        # self.wifi_display = WiFi(self)
-        self.pages = [self.dashboard_display, self.settings_display, self.bluetooth_display]
+        self.wifi_display = WiFi(self)
+        self.pages = [self.dashboard_display, self.settings_display, self.bluetooth_display, self.wifi_display]
 
         self.start()
 

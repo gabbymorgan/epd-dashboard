@@ -133,10 +133,10 @@ class Bluetooth(Component):
             if self.router.current_page_index == EPaperInterface.PAGE_INDEX_BLUETOOTH:
                 incoming_char = self.ui.incoming_char
                 match incoming_char:
-                    case 'b':
+                    case readchar.key.CTRL_B:
                         self.router.navigate(
                             EPaperInterface.PAGE_INDEX_SETTINGS)
-                    case 'r':
+                    case readchar.key.CTRL_R:
                         if self.loading:
                             return
                         self.options_visible_start = 0

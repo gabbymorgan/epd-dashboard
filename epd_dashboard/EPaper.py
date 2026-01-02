@@ -4,7 +4,7 @@ import os
 import time
 import readchar
 
-from PIL import Image, ImageFont
+from PIL import Image, ImageFont, ImageDraw
 from epd_dashboard.lib import epd2in13_V4
 
 fontdir = os.path.join(os.path.dirname(os.path.dirname(
@@ -88,7 +88,7 @@ class EPaperInterface():
                 self.awaken()
             elif now - self.last_full_refresh > self.MAX_REFRESH_INTERVAL:
                 self.clear_screen()
-            time.sleep(1)
+            time.sleep(.2)
 
     def keyboard_loop(self):
         while self.keyboard_thread_flag == True:
@@ -112,7 +112,7 @@ class EPaperInterface():
     def awaken(self):
         self.screen_is_active = True
         self.display.init()
-        self.render(self.canvas)
+        self.render(force_full_refresh=True)
 
     def clear_screen(self):
         self.display.init()
@@ -121,17 +121,18 @@ class EPaperInterface():
     def reset_canvas(self):
         self.canvas = Image.new('1', (self.height, self.width), 255)
 
-    def render(self, isFrame=False):
+    def render(self, force_full_refresh=False):
         self.should_render = False
         if not self.screen_is_active:
             return
         canvas = copy.deepcopy(self.canvas)
         canvas = canvas.rotate(180)
-        if self.partial_refresh_counter >= EPaperInterface.MAX_PARTIAL_REFRESHES or isFrame:
+        if self.partial_refresh_counter >= EPaperInterface.MAX_PARTIAL_REFRESHES or force_full_refresh:
             self.display.init()
             self.display.displayPartBaseImage(
                 self.display.getbuffer(canvas))
             self.partial_refresh_counter = 0
+            time.sleep(.8)
         else:
             self.display.displayPartial(self.display.getbuffer(canvas))
             self.partial_refresh_counter += 1
@@ -152,3 +153,43 @@ class EPaperInterface():
         text_width = right - left
         text_height = bottom - top
         return text_width, text_height
+
+    def get_box_for_dimensions(self, width, height, x_alignment, y_alignment, x_offset=0, y_offset=0):
+        x_values = {
+            "center": (self.height-width)//2 + x_offset,
+            "left": x_offset,
+            "right": self.height - width + x_offset
+        }
+
+        y_values = {
+            "center": (self.width-height)//2 + y_offset,
+            "top": y_offset,
+            "bottom": self.width - height + y_offset
+        }
+
+        init_x = x_values[x_alignment]
+        init_y = y_values[y_alignment]
+        final_x = init_x + width
+        final_y = init_y + height
+
+        return (init_x, init_y, final_x, final_y)
+
+    def get_box_for_text(self, text, font, x_alignment, y_alignment, x_offset=0, y_offset=0):
+        left, top, right, bottom = font.getbbox(text)
+        text_width = right - left
+        text_height = bottom - top
+        return self.get_box_for_dimensions(text_width, text_height, x_alignment, y_alignment, x_offset, y_offset)
+
+
+    def draw_text(self, text, font, x_alignment, y_alignment, x_offset=0, y_offset=0):
+        draw = ImageDraw.Draw(self.canvas)
+        init_x, init_y, final_x, final_y = self.get_box_for_text(
+            text, font, x_alignment, y_alignment, x_offset, y_offset)
+        draw.text((init_x, init_y),
+                  text, font=font)
+
+    def draw_rectangle(self, width, height, x_alignment, y_alignment, x_offset=0, y_offset=0, outline=255, fill=255):
+        draw = ImageDraw.Draw(self.canvas)
+        init_x, init_y, final_x, final_y = self.get_box_for_dimensions(
+            width, height, x_alignment, y_alignment, x_offset=x_offset, y_offset=y_offset)
+        draw.rectangle((init_x, init_y, final_x, final_y), outline=outline, fill=fill)
